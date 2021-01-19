@@ -1,1 +1,80 @@
+package datacollection
 
+import (
+	"encoding/csv"
+	"fmt"
+	"os"
+	"time"
+
+	"github.com/markcheno/go-quote"
+	"github.com/mmcdole/gofeed"
+)
+
+func f1() {
+
+	fmt.Println("Enter Stock Number")
+	var StructSelectionVAR int
+	fmt.Scanln(&StructSelectionVAR)
+	/////////////////////////////////////////////CVS URL/////////////////////////////////////////////////////////////////////
+
+	// 1. Open the file
+	recordFile1, err := os.Open("C:/Go/src/AAA/src/SEC Ticker URL - Sheet1.csv")
+	if err != nil {
+		fmt.Println("An error encountered ::", err)
+	}
+	reader := csv.NewReader(recordFile1) // 2. Initialize the reader
+	records1, _ := reader.ReadAll()      // 3. Read all the records
+
+	///////////////////////////////////////////RSS FEED////////////////////////////////////////////////////////////////////////
+	URLParser := gofeed.NewParser()
+	feed, _ := URLParser.ParseURL(records1[StructSelectionVAR][1])
+	var ArrayOfItems []*gofeed.Item
+	ArrayOfItems = feed.Items
+	//////////////////////////////////////////Time related/////////////////////////////////////////////////////////////////////
+
+	//Adds time to the entry time for price quote
+	TimeAtEntry := *ArrayOfItems[0].UpdatedParsed
+	TimeAtEntryPlusXdays := (*ArrayOfItems[0].UpdatedParsed).AddDate(0, 0, 10)
+
+	//changes time from RSS Feed to time used by Quote
+	TimeAtEntryFormatted := TimeAtEntry.Format("2006-01-02")
+	TimeAtEntryPlusXdaysFormatted := TimeAtEntryPlusXdays.Format("2006-01-02")
+
+	//Gets the time diffrental between the latest entry and second latest entry
+	TimeDiffEntrys := ArrayOfItems[0].UpdatedParsed.Sub(*ArrayOfItems[1].UpdatedParsed)
+	out := time.Time{}.Add(TimeDiffEntrys)
+
+	///////////////////////////////////////////Making a data structure to be used in the model///////////////////////////////////
+	VARstock, _ := quote.NewQuoteFromYahoo((records1[StructSelectionVAR][0]), TimeAtEntryFormatted, TimeAtEntryPlusXdaysFormatted, quote.Daily, true)
+
+	s := feed.Title
+	last12 := s[len(s)-12:]
+
+	SecDataStruct := []struct {
+		TickerSEC          string
+		FullStockName      string
+		EntryTitle         string
+		TimeAtEntry        *time.Time
+		TimeSinceLastEntry string
+		SECfilingNumber    string
+		PricingDataAtEntry string
+	}{
+		{records1[StructSelectionVAR][0],
+			feed.Title,
+			ArrayOfItems[0].Title,
+			ArrayOfItems[0].UpdatedParsed,
+			out.Format("2006-01-02"),
+			last12,
+			VARstock.CSV(),
+		},
+	}
+	//Testing the struct
+	fmt.Println(SecDataStruct[0].TickerSEC)
+	fmt.Println(SecDataStruct[0].FullStockName)
+	fmt.Println(SecDataStruct[0].SECfilingNumber)
+	fmt.Println(SecDataStruct[0].EntryTitle)
+	fmt.Println(SecDataStruct[0].TimeAtEntry)
+	fmt.Println(SecDataStruct[0].TimeSinceLastEntry)
+	fmt.Println(SecDataStruct[0].PricingDataAtEntry)
+
+}
